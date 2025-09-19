@@ -1,66 +1,112 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 
-# One-file spec for MGWRApp (Windows)
-# 產出：dist/MGWRApp.exe 只有一顆執行檔
-
-import sys
-from PyInstaller.utils.hooks import collect_submodules
-
-main_script = 'main.py'
-
-# 將常見的動態匯入一次蒐集起來，避免漏模組
-hidden_imports = (
-    collect_submodules('mgwrlib')
-    + collect_submodules('spglm')
-    + collect_submodules('numpy')
-    + collect_submodules('scipy')
-)
-
-# 靜態資源
-datas = [
-    ('img/*', 'img'),
-    ('fonts/*', 'fonts'),
-    ('src/*', 'src'),
-]
+from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 block_cipher = None
 
+project_root = Path.cwd()
+
+
+def dedupe(items):
+    seen = set()
+    unique = []
+    for src, dest in items:
+        key = (src, dest)
+        if key not in seen:
+            unique.append((src, dest))
+            seen.add(key)
+    return unique
+
+
+def safe_collect(collector, package, **kwargs):
+    try:
+        return collector(package, **kwargs)
+    except ImportError:
+        return []
+
+
+datas = []
+
+img_dir = project_root / "img"
+if img_dir.exists():
+    datas.append((str(img_dir), "img"))
+
+font_file = project_root / "fonts" / "arial.ttf"
+if font_file.exists():
+    datas.append((str(font_file), "fonts"))
+
+# Library data that is required at runtime but not imported directly.
+datas.extend(safe_collect(collect_data_files, "pyproj", excludes=["test*", "tests*"]))
+datas.extend(safe_collect(collect_data_files, "spglm", excludes=["test*", "tests*"]))
+datas.extend(safe_collect(collect_data_files, "spreg", excludes=["test*", "tests*"]))
+datas.extend(safe_collect(collect_data_files, "libpysal", excludes=["examples*", "tests*"]))
+datas = dedupe(datas)
+
+binaries = []
+binaries.extend(safe_collect(collect_dynamic_libs, "pyproj"))
+binaries.extend(safe_collect(collect_dynamic_libs, "shapely"))
+binaries.extend(safe_collect(collect_dynamic_libs, "spglm"))
+binaries.extend(safe_collect(collect_dynamic_libs, "spreg"))
+binaries.extend(safe_collect(collect_dynamic_libs, "libpysal"))
+binaries = dedupe(binaries)
+
+hiddenimports = [
+    "shapely.speedups._speedups",
+    "sklearn.utils._weight_vector",
+    "sklearn.utils._typedefs",
+]
+
+excludes = [
+    "lib2to3.tests",
+    "email.tests",
+    "pydoc_data",
+    "numpy.random._examples",
+    "tkinter.test",
+]
+
 a = Analysis(
-    [main_script],
-    pathex=['.'],
-    binaries=[],
+    ["main.py"],
+    pathex=[str(project_root)],
+    binaries=binaries,
     datas=datas,
-    hiddenimports=hidden_imports,
+    hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
-    noarchive=False,     # 保持預設，通常較穩
+    noarchive=False,
+    optimize=1,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(
+    a.pure,
+    a.zipped_data,
+    cipher=block_cipher,
+)
 
-# === 關鍵：one-file 寫法 ===
-# 1) 不要 COLLECT
-# 2) EXE 內直接帶入 a.binaries / a.zipfiles / a.datas
-# 3) 不要 exclude_binaries=True
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
-    name='MGWRApp',
+    exclude_binaries=True,
+    name="MGWR",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,                 # 若一切正常可改 True；發生 DLL 問題先維持 False
-    upx_exclude=[],
-    console=False,             # 若需主控台輸出改 True
-    icon='resources/img/MGWR-pc.ico',
-    runtime_tmpdir=None,       # 解壓到系統暫存目錄（one-file 必要行為）
+    upx=True,
+    console=False,
+    icon='resources/img/MGWR-pc.ico'
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    name="MGWR",
 )
