@@ -1,106 +1,76 @@
 ﻿# -*- mode: python ; coding: utf-8 -*-
 
+import os
+import sys
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs
 
 block_cipher = None
 
-project_root = Path.cwd()
-
-
-def dedupe(items):
-    seen = set()
-    unique = []
-    for src, dest in items:
-        key = (src, dest)
-        if key not in seen:
-            unique.append((src, dest))
-            seen.add(key)
-    return unique
-
-
-def safe_collect(collector, package, **kwargs):
-    try:
-        return collector(package, **kwargs)
-    except ImportError:
-        return []
-
-
-datas = []
-
-img_dir = project_root / "img"
-if img_dir.exists():
-    datas.append((str(img_dir), "img"))
-
-font_file = project_root / "fonts" / "arial.ttf"
-if font_file.exists():
-    datas.append((str(font_file), "fonts"))
-
-# Library data that is required at runtime but not imported directly.
-datas.extend(safe_collect(collect_data_files, "pyproj", excludes=["test*", "tests*"]))
-datas.extend(safe_collect(collect_data_files, "spglm", excludes=["test*", "tests*"]))
-datas.extend(safe_collect(collect_data_files, "spreg", excludes=["test*", "tests*"]))
-datas.extend(safe_collect(collect_data_files, "libpysal", excludes=["examples*", "tests*"]))
-datas = dedupe(datas)
+project_root = Path(os.getcwd())
 
 binaries = []
-binaries.extend(safe_collect(collect_dynamic_libs, "pyproj"))
-binaries.extend(safe_collect(collect_dynamic_libs, "shapely"))
-binaries.extend(safe_collect(collect_dynamic_libs, "spglm"))
-binaries.extend(safe_collect(collect_dynamic_libs, "spreg"))
-binaries.extend(safe_collect(collect_dynamic_libs, "libpysal"))
-binaries = dedupe(binaries)
+for package in ("PyQt5", "numpy", "scipy", "sklearn", "pyproj", "PIL", "shapely"):
+    try:
+        binaries += collect_dynamic_libs(package)
+    except Exception:
+        pass
 
-hiddenimports = [
-    "shapely.speedups._speedups",
-    "sklearn.utils._weight_vector",
-    "sklearn.utils._typedefs",
-]
+library_bin = Path(os.environ.get("CONDA_PREFIX", sys.prefix)) / "Library" / "bin"
+if library_bin.exists():
+    for dll_path in library_bin.glob('*.dll'):
+        binaries.append((str(dll_path), '.'))
 
-excludes = [
-    "lib2to3.tests",
-    "email.tests",
-    "pydoc_data",
-    "numpy.random._examples",
-    "tkinter.test",
-]
+library_plugins = library_bin / 'plugins'
+if library_plugins.exists():
+    for file_path in library_plugins.rglob('*'):
+        if file_path.is_file():
+            relative_target = Path('plugins') / file_path.relative_to(library_plugins)
+            binaries.append((str(file_path), str(relative_target)))
+
+datas = []
+for folder in ("img", "fonts", "resources", "georgia"):
+    folder_path = project_root / folder
+    if folder_path.exists():
+        for file_path in folder_path.rglob('*'):
+            if file_path.is_file():
+                relative_target = Path(folder) / file_path.relative_to(folder_path).parent
+                datas.append((str(file_path), str(relative_target)))
+
+hiddenimports = collect_submodules("mgwrlib")
 
 a = Analysis(
-    ["main.py"],
+    ['main.py'],
     pathex=[str(project_root)],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    excludes=excludes,
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
-    optimize=1,
 )
-
-pyz = PYZ(
-    a.pure,
-    a.zipped_data,
-    cipher=block_cipher,
-)
-
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name="MGWR",
+    name='MGWR-GUI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=False,
-    icon='resources/img/MGWR-pc.ico'
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=str(project_root / 'resources' / 'img' / 'MGWR-pc.ico')
 )
-
 coll = COLLECT(
     exe,
     a.binaries,
@@ -108,5 +78,6 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=True,
-    name="MGWR",
+    upx_exclude=[],
+    name='MGWR-GUI',
 )
