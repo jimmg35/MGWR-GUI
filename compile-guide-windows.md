@@ -39,14 +39,14 @@ Remove-Item build,dist -Recurse -Force -ErrorAction SilentlyContinue
 ## 5. Build the PyInstaller Bundle
 
 ```powershell
-& python -m PyInstaller --clean --noconfirm build.spec
+python -m PyInstaller --clean --noconfirm build.spec
 ```
 
 Key outputs:
 
-- `dist\MGWR-GUI\MGWR-GUI.exe` ? the GUI launcher.
-- `dist\MGWR-GUI\_internal\` ? packaged resources and libraries.
-- `build\` ? PyInstaller intermediates (safe to delete after packaging).
+- `dist\MGWR-GUI\MGWR-GUI.exe` the GUI launcher.
+- `dist\MGWR-GUI\_internal\` packaged resources and libraries.
+- `build\` PyInstaller intermediates (safe to delete after packaging).
 
 ## 6. (Optional) Test the Executable
 
