@@ -234,7 +234,7 @@ def summaryCitation(self):
 
 def summaryTeam(self):
     summary = 'Development Team:\n'
-    summary += 'Ziqi Li, Mehak Sachdeva, Chen-Lun Kao, Jiajun Chang, and Stewart Fotheringham\n'
+    summary += 'Ziqi Li, Mehak Sachdeva, Chen-Lun Kao, Jia-Jun Chang, and Stewart Fotheringham\n'
     summary += 'Past Contributors:\n'
     summary += 'Taylor Oshan, Wei Kang, Hanchen Yu, Sarah Bardin, and Levi Wolf\n'
     summary += '=' * 80 + '\n'
